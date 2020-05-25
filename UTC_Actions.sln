@@ -1,0 +1,23 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30011.22
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "UTC_Actions", "UTC_Actions\UTC_Actions.pyproj", "{9FCD2598-DF75-48F0-987F-C90A0B809655}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9FCD2598-DF75-48F0-987F-C90A0B809655}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9FCD2598-DF75-48F0-987F-C90A0B809655}.Release|Any CPU.ActiveCfg = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {21AD49E6-045A-485D-B2BF-B1C0CAF9269E}
+	EndGlobalSection
+EndGlobal
