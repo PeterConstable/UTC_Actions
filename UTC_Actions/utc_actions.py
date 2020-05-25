@@ -30,9 +30,9 @@ utcDocRegistry_urls = {
     }
 
 
-utcDocRegPages_pickleFile = 'utc_doc_reg/utcDocRegPages.pickle'
-utcDocRegTables_pickleFile = 'utc_doc_reg/utcDocRegTables.pickle'
-utcMinutesPages_pickleFile = 'utc_doc_reg/utcAllMeetingMinutesPages.pickle'
+utcDocRegPages_pickleFile = 'pickle_jar/utcDocRegPages.pickle'
+utcDocRegTables_pickleFile = 'pickle_jar/utcDocRegTables.pickle'
+utcMinutesPages_pickleFile = 'pickle_jar/utcAllMeetingMinutesPages.pickle'
 
 docRegistryTableColumns = ["Document Number", "URL", "Subject", "Source", "Date"]
 
