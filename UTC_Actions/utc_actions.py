@@ -122,18 +122,16 @@ def desoupTableRows(table: Tag, removeHeadingRow = True):
     If removeHeadingRow is true, removes the first row if it has <th> cells.
     '''
 
-    #get the table rows as a list; filter out newline elements and rows with only whitespace
-    rows = [tr for tr in table.contents
-            if tr != '\n' and not (re.fullmatch(whitespace_pattern, tr.text))
-            and not isinstance(tr, Comment)
-            ]
+    # get all the <tr> elements -- returns a 'bs4.element.ResultSet' which is a list subclass
+    rows = table.find_all("tr")
 
-    # clean-up rows by removing newline elements and comments
-    rows = [
-        [td for td in row.contents if td != '\n' and not isinstance(td.string, Comment)]
-        for row in rows # each row is a soup so has .contents
-        ]
-
+    # create a new list of lists: top level elements are list objects corresponding to rows;
+    # 2nd level list elements are "td" or "th" soups
+    rows = [ 
+        [cell for cell in row.find_all(["th", "td"]) ]
+         for row in rows if not (re.fullmatch(whitespace_pattern, row.text))
+         ]
+    
     # rows are now lists, and cells are soups
 
     # ignore heading row
@@ -246,7 +244,7 @@ def updateDocRegTablesToLatest():
     # tables regardless
     pickle_file = Path(utcDocRegTables_pickleFile)
     if not pickle_file.is_file():
-        docRegTables = getAllDocRegistryTables
+        docRegTables = getAllDocRegistryTables()
     else:
         # get pickled tables
         with open(utcDocRegTables_pickleFile, 'rb') as file:
