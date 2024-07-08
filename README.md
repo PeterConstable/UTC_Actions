@@ -23,3 +23,7 @@ This module relies on some packages that not typically bundled with Python distr
 * [**reguests**](https://requests.readthedocs.io/en/master/): provides high-level HTTP support, used here to get pages
 * [**BeautifulSoup**](https://www.crummy.com/software/BeautifulSoup/): provides support for parsing HTML content
 * [**lxml**](https://lxml.de/): low-level XML and HTML parsing support, utilized here in conjunction with BeautifulSoup
+
+Dependencies are captured in the `requirements.txt` file and can be installed using the following command line:
+
+> python -m pip install -r requirements.txt
