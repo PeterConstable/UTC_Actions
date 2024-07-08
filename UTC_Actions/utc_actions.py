@@ -26,7 +26,11 @@ utcDocRegistry_urls = {
     2017: "https://www.unicode.org/L2/L2017/Register-2017.html",
     2018: "https://www.unicode.org/L2/L2018/Register-2018.html",
     2019: "https://www.unicode.org/L2/L2019/Register-2019.html",
-    2020: "https://www.unicode.org/L2/L-curdoc.htm"
+    2020: "https://www.unicode.org/L2/L2020/Register-2020.html",
+    2021: "https://www.unicode.org/L2/L2021/Register-2021.html",
+    2022: "https://www.unicode.org/L2/L2022/Register-2022.html",
+    2023: "https://www.unicode.org/L2/L2023/Register-2023.html",
+    2024: "https://www.unicode.org/L2/L-curdoc.htm"
     }
 
 
