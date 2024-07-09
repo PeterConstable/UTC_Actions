@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup, Comment, Tag
 from pathlib import Path
 import pickle
 import re
+import os
 
 
 utcDocRegistry_urls = {
@@ -35,11 +36,9 @@ utcDocRegistry_urls = {
 
 # relative paths for pickle files to cache raw doc registry pages, 
 # contents of the table in those pages, and content of UTC meeting
-# minute pages -- 
-# 
-# Note: when using the Python open( ... 'wb') function to create
-# the pickle files, it will fail if the pickle_jar folder does not 
-# exist.
+# minute pages
+if not os.path.exists("pickle_jar"):
+    os.makedirs("pickle_jar")
 utcDocRegPages_pickleFile = 'pickle_jar/utcDocRegPages.pickle'
 utcDocRegTables_pickleFile = 'pickle_jar/utcDocRegTables.pickle'
 utcMinutesPages_pickleFile = 'pickle_jar/utcAllMeetingMinutesPages.pickle'
