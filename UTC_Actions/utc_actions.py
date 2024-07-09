@@ -278,6 +278,36 @@ def updateDocRegTablesToLatest():
 #--------------------------------------------------------
 #  Functions for yearly UTC meeting minutes documents
 
+def findMinutesRowsInYearRows(table:list):
+    minutes_rows = [
+        row for row in table
+        if re.search('minute', row[2].lower()) is not None
+        and re.search('(utc|uct)', row[2].lower()) is not None
+        and row[1][-3:] != 'pdf'
+        and row[1][-9:] != 'NOTPOSTED'
+        ]
+    return minutes_rows
+
+
+def getMinutesDetails(base_url, doc_row:list, lastMeetingNumber:int = 0):
+    details = []
+    m = re.search('((UTC|UCT) ?#?)([0-9]*)', doc_row[2])
+    assert m is not None
+    mtg_num = int(m.group(3))
+    if mtg_num > lastMeetingNumber:
+        url = base_url + doc_row[1]
+        if lastMeetingNumber > 0:
+            print(f"retrieving UTC meeting {mtg_num} minutes doc")
+        page = requests.get(url).text
+        soup = BeautifulSoup(page, 'lxml')
+        title = soup.title.text
+        details = [mtg_num, str(doc_row[0]), str(title), page]
+    return details
+
+
+
+
+
 def getAllMeetingMinutes():
     pickle_file = Path(utcMinutesPages_pickleFile)
     if pickle_file.is_file():
@@ -290,24 +320,27 @@ def getAllMeetingMinutes():
             # looking at doc registry for one year (y)
             year_reg_url = utcDocRegistry_urls[y]
             base_url = year_reg_url[:year_reg_url.rindex("/") + 1]
-            # get the doc registry rows for UTC minutes
-            year_rows = [
-                row for row in t 
-                if re.search('minute', row[2].lower()) is not None
-                and re.search('(utc|uct)', row[2].lower()) is not None
-                and row[1][-3:] != 'pdf'
-                and row[1][-9:] != 'NOTPOSTED'
-                ]
+            # get the doc registry rows for UTC minutes -- minutes_rows is a list of lists
+            minutes_rows = findMinutesRowsInYearRows(t)
             print(f"retrieving UTC meeting minutes docs for {y}")
-            for i in range(len(year_rows)):
-                url = base_url + year_rows[i][1]
+            for i in range(len(minutes_rows)):
+# The following lines are similar to lines in updateAllMeetingMinutesToLatest().
+# However, they can't be refactored into a shared function. In getAllMeetingMinutes,
+# we can fetch all minutes pages. But in updateAllMeetingMinutesToLatest() we don't
+# want to fetch pages that have previously been cached. In that case, we filter
+# minutes_rows checking the meeting number in the row title field. But in some early
+# doc registry pages, the title field for UTC meeting docs didn't always include
+# the meeting number, and the only way to get the meeting number is to fetch the
+# page.
+                url = base_url + minutes_rows[i][1]
                 page = requests.get(url).text
                 soup = BeautifulSoup(page, 'lxml')
                 title = soup.title.text
                 m = re.search('(UTC ?#?)([0-9]*)', title)
                 assert m is not None
                 mtg_num = int(m.group(2))
-                allMtgMinutes[mtg_num] = [y, i + 1, str(year_rows[i][0]), str(title), page]
+                allMtgMinutes[mtg_num] = [y, i + 1, str(minutes_rows[i][0]), str(title), page]
+
         with open(pickle_file, 'wb') as file:
             pickle.dump(allMtgMinutes, file, protocol=pickle.HIGHEST_PROTOCOL)
             pass
@@ -337,13 +370,7 @@ def updateAllMeetingMinutesToLatest():
             base_url = year_reg_url[:year_reg_url.rindex("/") + 1]
             # get the doc registry rows for UTC minutes
             yearTable = docRegTables[y]
-            minutes_rows = [
-                row for row in yearTable
-                if re.search('minute', row[2].lower()) is not None
-                and re.search('(utc|utc)', row[2].lower()) is not None
-                and row[1][-3:] != 'pdf'
-                and row[1][-9:] != 'NOTPOSTED'
-                ]
+            minutes_rows = findMinutesRowsInYearRows(yearTable)
 
             for i in range(len(minutes_rows)):
                 m = re.search('(UTC ?#?)([0-9]*)', minutes_rows[i][2])
