@@ -33,7 +33,13 @@ utcDocRegistry_urls = {
     2024: "https://www.unicode.org/L2/L-curdoc.htm"
     }
 
-
+# relative paths for pickle files to cache raw doc registry pages, 
+# contents of the table in those pages, and content of UTC meeting
+# minute pages -- 
+# 
+# Note: when using the Python open( ... 'wb') function to create
+# the pickle files, it will fail if the pickle_jar folder does not 
+# exist.
 utcDocRegPages_pickleFile = 'pickle_jar/utcDocRegPages.pickle'
 utcDocRegTables_pickleFile = 'pickle_jar/utcDocRegTables.pickle'
 utcMinutesPages_pickleFile = 'pickle_jar/utcAllMeetingMinutesPages.pickle'
@@ -294,13 +300,14 @@ def getAllMeetingMinutes():
             print(f"retrieving UTC meeting minutes docs for {y}")
             for i in range(len(year_rows)):
                 url = base_url + year_rows[i][1]
-                page = requests.get(url).text
-                soup = BeautifulSoup(page, 'lxml')
-                title = soup.title.text
-                m = re.search('(UTC ?#?)([0-9]*)', title)
-                assert m is not None
-                mtg_num = int(m.group(2))
-                allMtgMinutes[mtg_num] = [y, i + 1, str(year_rows[i][0]), str(title), page]
+                if not url.endswith('NOTPOSTED'):
+                    page = requests.get(url).text
+                    soup = BeautifulSoup(page, 'lxml')
+                    title = soup.title.text
+                    m = re.search('(UTC ?#?)([0-9]*)', title)
+                    assert m is not None
+                    mtg_num = int(m.group(2))
+                    allMtgMinutes[mtg_num] = [y, i + 1, str(year_rows[i][0]), str(title), page]
         with open(pickle_file, 'wb') as file:
             pickle.dump(allMtgMinutes, file, protocol=pickle.HIGHEST_PROTOCOL)
             pass
