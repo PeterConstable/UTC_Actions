@@ -34,6 +34,7 @@ utcDocRegistry_urls = {
     2024: "https://www.unicode.org/L2/L-curdoc.htm"
     }
 
+
 # relative paths for pickle files to cache raw doc registry pages, 
 # contents of the table in those pages, and content of UTC meeting
 # minute pages
@@ -284,7 +285,7 @@ def getAllMeetingMinutes():
             allMtgMinutes = pickle.load(file)
     else:
         allMtgMinutes = {} #entries will have: mtg # (key), year, qtr, doc #, title, page content
-        tables = getAllDocRegistryTables()
+        tables = updateDocRegTablesToLatest()
         for y, t in tables.items():
             # looking at doc registry for one year (y)
             year_reg_url = utcDocRegistry_urls[y]
@@ -295,37 +296,83 @@ def getAllMeetingMinutes():
                 if re.search('minute', row[2].lower()) is not None
                 and re.search('(utc|uct)', row[2].lower()) is not None
                 and row[1][-3:] != 'pdf'
+                and row[1][-9:] != 'NOTPOSTED'
                 ]
             print(f"retrieving UTC meeting minutes docs for {y}")
             for i in range(len(year_rows)):
                 url = base_url + year_rows[i][1]
-                if not url.endswith('NOTPOSTED'):
-                    page = requests.get(url).text
-                    soup = BeautifulSoup(page, 'lxml')
-                    title = soup.title.text
-                    m = re.search('(UTC ?#?)([0-9]*)', title)
-                    assert m is not None
-                    mtg_num = int(m.group(2))
-                    allMtgMinutes[mtg_num] = [y, i + 1, str(year_rows[i][0]), str(title), page]
+                page = requests.get(url).text
+                soup = BeautifulSoup(page, 'lxml')
+                title = soup.title.text
+                m = re.search('(UTC ?#?)([0-9]*)', title)
+                assert m is not None
+                mtg_num = int(m.group(2))
+                allMtgMinutes[mtg_num] = [y, i + 1, str(year_rows[i][0]), str(title), page]
         with open(pickle_file, 'wb') as file:
             pickle.dump(allMtgMinutes, file, protocol=pickle.HIGHEST_PROTOCOL)
             pass
     return allMtgMinutes
 
 
+def updateAllMeetingMinutesToLatest():
+    pickle_file = Path(utcMinutesPages_pickleFile)
+    if not pickle_file.is_file():
+        allMtgMinutes = getAllMeetingMinutes()
+    else:
+        # get pickled minutes info
+        with open(utcMinutesPages_pickleFile, 'rb') as file:
+            allMtgMinutes = pickle.load(file)
+        # get details on last stored meeting
+        allMeetings = list(allMtgMinutes)
+        lastMeetingNumber = allMeetings[-1]
+        lastMeetingYear = allMtgMinutes[lastMeetingNumber][0]
+        # compare to known
+        lastKnownYear = list(utcDocRegistry_urls)[-1]
+        yearsToCheck = list(range(lastMeetingYear, lastKnownYear + 1))
+
+        docRegTables = updateDocRegTablesToLatest()
+        for y in yearsToCheck:
+            # looking at doc registry for one year (y)
+            year_reg_url = utcDocRegistry_urls[y]
+            base_url = year_reg_url[:year_reg_url.rindex("/") + 1]
+            # get the doc registry rows for UTC minutes
+            yearTable = docRegTables[y]
+            minutes_rows = [
+                row for row in yearTable
+                if re.search('minute', row[2].lower()) is not None
+                and re.search('(utc|utc)', row[2].lower()) is not None
+                and row[1][-3:] != 'pdf'
+                and row[1][-9:] != 'NOTPOSTED'
+                ]
+
+            for i in range(len(minutes_rows)):
+                m = re.search('(UTC ?#?)([0-9]*)', minutes_rows[i][2])
+                assert m is not None
+                mtg_num = int(m.group(2))
+                if mtg_num > lastMeetingNumber:
+                    url = base_url + minutes_rows[i][1]
+                    print(f"retrieving UTC meeting {mtg_num} minutes doc")
+                    page = requests.get(url).text
+                    soup = BeautifulSoup(page, 'lxml')
+                    title = soup.title.text
+                    m = re.search('(UTC ?#?)([0-9]*)', title)
+                    assert m is not None
+                    mtg_num = int(m.group(2))
+                    allMtgMinutes[mtg_num] = [y, i + 1, str(minutes_rows[i][0]), str(title), page]
+
+        with open(pickle_file, 'wb') as file:
+            pickle.dump(allMtgMinutes, file, protocol=pickle.HIGHEST_PROTOCOL)
+    return allMtgMinutes
 
 
 # utcDocRegPages = getAllDocRegistryPages()
-
-# utcDocRegPages = updateDocRegPagesToLatest()
-
+utcDocRegPages = updateDocRegPagesToLatest()
 
 # utcDocRegTables = getAllDocRegistryTables()
-
 utcDocRegTables = updateDocRegTablesToLatest()
 
-utc_minutes = getAllMeetingMinutes()
-
+# utc_minutes = getAllMeetingMinutes()
+utc_minutes = updateAllMeetingMinutesToLatest()
 
 
 
