@@ -392,11 +392,47 @@ def updateAllMeetingMinutesToLatest():
     return allMtgMinutes
 
 
+def findActionsInMinutes(doc:list, actionType):
+    ''' Gets a list of the actions from a minutes doc.
+
+        Takes a row from a minutes entry, and an action type string.
+       
+        The minutes entry row is a list with 5 elements, the
+        last element being the page content. 
+        
+        The expected actionType values are "AI", "consensus", "motion" or "note".
+
+        From the page content, uses BeautifulSoup to find all the motions 
+        -- that is, all <p> or <blockquote> elements containing a string
+        correcponding to the action type (e.g., "Consensus" or "consensus"
+        for a consensus action type). It then returns a list of the text
+        content from those elements.
+    '''
+    pageContent = doc[-1]
+    soup = BeautifulSoup(pageContent, 'lxml')
+
+    # define the re patterns for the action types
+    patterns = {
+        "AI": "(?<!\.)(A|a)(C|c)(T|t)(I|i)(O|o)(N|n) (I|i)(T|t)(E|e)(M|m)",
+        "consensus": "(?<!\.)(C|c)(O|o)(N|n)(S|s)(E|e)(N|n)(S|s)(U|u)(S|s)",
+        "motion": "(?<!\.)(M|)m(O|o)(T|t)(I|i)(O|o)(N|n)",
+        "note": "(?<!\.)(N|n)(O|o)(T|t)(E|e)"
+        }
+    pattern = patterns[actionType]
+    actionStrings = soup.find_all(string = re.compile(pattern))
+    actions = [
+        s.find_parent(["blockquote", "p"]).text
+        for s in actionStrings
+        ]
+    return actions
+
+
+
 # utcDocRegPages = getAllDocRegistryPages()
-utcDocRegPages = updateDocRegPagesToLatest()
+# utcDocRegPages = updateDocRegPagesToLatest()
 
 # utcDocRegTables = getAllDocRegistryTables()
-utcDocRegTables = updateDocRegTablesToLatest()
+# utcDocRegTables = updateDocRegTablesToLatest()
 
 # utc_minutes = getAllMeetingMinutes()
 utc_minutes = updateAllMeetingMinutesToLatest()
