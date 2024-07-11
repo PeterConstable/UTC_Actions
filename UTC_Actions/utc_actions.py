@@ -306,8 +306,6 @@ def getMinutesDetails(base_url, doc_row:list, lastMeetingNumber:int = 0):
 
 
 
-
-
 def getAllMeetingMinutes():
     pickle_file = Path(utcMinutesPages_pickleFile)
     if pickle_file.is_file():
@@ -413,18 +411,40 @@ def findActionsInMinutes(doc:list, actionType):
 
     # define the re patterns for the action types
     patterns = {
-        "AI": "(?<!\.)(A|a)(C|c)(T|t)(I|i)(O|o)(N|n) (I|i)(T|t)(E|e)(M|m)",
-        "consensus": "(?<!\.)(C|c)(O|o)(N|n)(S|s)(E|e)(N|n)(S|s)(U|u)(S|s)",
-        "motion": "(?<!\.)(M|)m(O|o)(T|t)(I|i)(O|o)(N|n)",
-        "note": "(?<!\.)(N|n)(O|o)(T|t)(E|e)"
+        "AI": "A(C|c)(T|t)(I|i)(O|o)(N|n) (I|i)(T|t)(E|e)(M|m)",
+        "consensus": "C(O|o)(N|n)(S|s)(E|e)(N|n)(S|s)(U|u)(S|s)",
+        "motion": "M(O|o)(T|t)(I|i)(O|o)(N|n)",
+        "note": "N(O|o)(T|t)(E|e)"
         }
     pattern = patterns[actionType]
     actionStrings = soup.find_all(string = re.compile(pattern))
     actions = [
-        s.find_parent(["blockquote", "p"]).text
+        # Different minutes docs are structured differently (and some, badly)
+        s.find_parent(["blockquote", "dd", "div", "p", "ul"]).text.replace('\n', ' ').replace('\r', ' ').replace('\xa0', ' ')
         for s in actionStrings
         ]
     return actions
+
+
+
+
+def compileActionsFromAllMinutes(actionType):
+    ''' Compiles all actions of a given type from all UTC meetings.
+
+        Takes an action type string: "AI", "consensus", "motion" or "note".
+
+        Returns a dictionary with entries of the form mtgNum: [actions list].
+        For example compilesActionsFromAllMinutes("AI")[179] would return the
+        list of all action items from meeting 179.
+    '''
+    allActions = {}
+    meetings = getAllMeetingMinutes()
+    for mtgNum, mtg in meetings.items():
+        print(f"getting actions for meeting {mtgNum}")
+        actions = findActionsInMinutes(mtg, actionType)
+        allActions[mtgNum] = actions
+    return allActions
+
 
 
 
