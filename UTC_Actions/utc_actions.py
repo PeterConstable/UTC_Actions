@@ -410,6 +410,10 @@ def findActionsInMinutes(doc:list, actionType):
         correcponding to the action type (e.g., "Consensus" or "consensus"
         for a consensus action type). It then returns a list of the text
         content from those elements.
+
+        The approach taken here is to search for strings ("Action Item", etc.)
+        and then look for a parent element. The list of parent element types
+        is determined by what has historically been used in minutes pages.
     '''
     pageContent = doc[-1]
     soup = BeautifulSoup(pageContent, 'lxml')
@@ -425,7 +429,7 @@ def findActionsInMinutes(doc:list, actionType):
     actionStrings = soup.find_all(string = re.compile(pattern))
     actions = [
         # Different minutes docs are structured differently (and some, badly)
-        s.find_parent(["blockquote", "dd", "div", "p", "ul"]).text.replace('\n', ' ').replace('\r', ' ').replace('\xa0', ' ')
+        re.sub('\s_', ' ', s.find_parent(["blockquote", "dd", "div", "p", "ul"]).text)
         for s in actionStrings
         ]
     return actions
@@ -433,7 +437,6 @@ def findActionsInMinutes(doc:list, actionType):
 
 def getAnchorParentText(a):
     try:
-#        p = a.find_parent(["blockquote", "dd", "div", "p", "ul"]).text.replace('\n', ' ').replace('\r', ' ').replace('\xa0', ' ').replace('  ', ' ')
         p = re.sub('\s+',' ', a.find_parent(["blockquote", "dd", "div", "p", "ul"]).text)
     except:
         print(f"exception: {a.text}")
