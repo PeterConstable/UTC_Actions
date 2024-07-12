@@ -38,8 +38,11 @@ utcDocRegistry_urls = {
 # relative paths for pickle files to cache raw doc registry pages, 
 # contents of the table in those pages, and content of UTC meeting
 # minute pages
-if not os.path.exists("pickle_jar"):
-    os.makedirs("pickle_jar")
+def createPickleJarFolder():
+    if not os.path.exists("pickle_jar"):
+        os.makedirs("pickle_jar")
+
+createPickleJarFolder()
 utcDocRegPages_pickleFile = 'pickle_jar/utcDocRegPages.pickle'
 utcDocRegTables_pickleFile = 'pickle_jar/utcDocRegTables.pickle'
 utcMinutesPages_pickleFile = 'pickle_jar/utcAllMeetingMinutesPages.pickle'
@@ -69,6 +72,7 @@ def getAllDocRegistryPages():
             docRegPages = pickle.load(file)
     else:
         # retrieve pages; pickle for future use
+        createPickleJarFolder()
         docRegPages = {}
         for year, url in utcDocRegistry_urls.items():
             print(f"retrieving doc registry page for {year}")
@@ -227,6 +231,7 @@ def getAllDocRegistryTables():
             tables = pickle.load(file)
     else:
         # derive table soups; pickle them for future
+        createPickleJarFolder()
         pages = getAllDocRegistryPages()
         tables = {}
         for year, page in pages.items():
@@ -426,6 +431,38 @@ def findActionsInMinutes(doc:list, actionType):
     return actions
 
 
+def getAnchorParentText(a):
+    try:
+#        p = a.find_parent(["blockquote", "dd", "div", "p", "ul"]).text.replace('\n', ' ').replace('\r', ' ').replace('\xa0', ' ').replace('  ', ' ')
+        p = re.sub('\s+',' ', a.find_parent(["blockquote", "dd", "div", "p", "ul"]).text)
+    except:
+        print(f"exception: {a.text}")
+        p = None
+    return p
+
+
+def findAllTaggedActionsInMinutes(doc:list):
+    ''' Gets a list of actions (all types) from a minutes doc. This assumes a
+        convention applied since UTC #90 that a "tagging" tool is run on the
+        minutes file turning the ID prefix for each action (e.g., "[123-C45]")
+        into an anchor element.
+
+        (More precisely, the anchor is applied to the string within square brackets.)
+
+        Takes a row from a minutes entry and returns a list of action strings.
+    '''
+    pageContent = doc[-1]
+    soup = BeautifulSoup(pageContent, 'lxml')
+    # define the pattern for the action ID contained in the anchor element
+    pattern = '[0-9]{0,3}-(AI?|C|L|M|N)[0-9a-z]{1,4}'
+    actionAnchorElements = soup.find_all("a", string=re.compile(pattern))
+    actions = [
+        # e.find_parent(["blockquote", "div", "p", "ul"]).text
+        getAnchorParentText(e)
+        for e in actionAnchorElements
+        ]
+    return actions
+
 
 
 def compileActionsFromAllMinutes(actionType):
@@ -445,6 +482,29 @@ def compileActionsFromAllMinutes(actionType):
         allActions[mtgNum] = actions
     return allActions
 
+
+def compileAllTaggedActionsFromAllMinutes():
+    ''' Compiles all actions of all types from all UTC meetings for which
+        the minutes have had the "tag" tool applied (started with UTC #90).
+    '''
+    allActions = {}
+    meetings = getAllMeetingMinutes()
+    for mtgNum, mtg in meetings.items():
+        if mtgNum >= 90:
+            print(f"getting actions for meeting {mtgNum}")
+            actions = findAllTaggedActionsInMinutes(mtg)
+            allActions[mtgNum] = actions
+    return allActions
+
+
+def writeToFileAllTaggedActionsFromAllMinutes(filename: str):
+    allActions = compileAllTaggedActionsFromAllMinutes()
+    f = open(filename, "w", encoding="utf-8")
+    for mtgNum, actions in allActions.items():
+        f.write(str(mtgNum) + "\n")
+        for a in actions:
+            f.write(a + "\n")
+    f.close()
 
 
 
