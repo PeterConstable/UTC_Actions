@@ -621,6 +621,7 @@ def findTaggedActionsInMinutes(doc:list, actionType = "all"):
         "lballot": '[0-9]{0,3}-L[0-9a-z]{1,4}',
         "all": '[0-9]{0,3}-(AI?|C|L|M|N)[0-9a-z]{1,4}'
     }
+    postAnchorPattern = re.compile("^[a-z]?\s*]")
 
     if not validateActionType(actionType):
         return
@@ -635,7 +636,7 @@ def findTaggedActionsInMinutes(doc:list, actionType = "all"):
         # getAnchorParentText(a)
         re.sub('\s+',' ', a.find_parent(["blockquote", "dd", "div", "p", "ul"]).text).strip()
         for a in actionAnchorElements
-        if isinstance(a.next_sibling, NavigableString) and a.next_sibling[0] == ']' 
+        if isinstance(a.next_sibling, NavigableString) and postAnchorPattern.match(a.next_sibling) is not None
             and isinstance(a.previous_sibling, NavigableString) and a.previous_sibling.strip() == '[' #some cases have whitespace
         ]
     return actions
