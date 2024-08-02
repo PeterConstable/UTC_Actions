@@ -257,7 +257,7 @@ def getAllDocRegistryTables(forceRefresh = False):
     return tables
 
 
-def updateDocRegTablesToLatest():
+def updateDocRegTablesWithLatest():
     '''Gets an up-to-date dict of yearly document registry tables.
     
     Will start with data from a local .pickle file, if present. Otherwise, a new
@@ -299,7 +299,7 @@ def updateDocRegTablesToLatest():
 #  Functions for yearly UTC meeting minutes documents
 
 def getFirstAndLastKnownUtcMeetings():
-    tables = updateDocRegTablesToLatest()
+    tables = utcDocRegTables
     earliest = 999
     latest = 0
     for y, t in tables.items():
@@ -338,7 +338,7 @@ def findMinutesRowsInYearRows(table:list):
 
 
 def findMinutesRowForMeeting(meetingNumber):
-    tables = getAllDocRegistryTables()
+    tables = utcDocRegTables
     for y, t in tables.items():
         # looking at doc registry for year y, check for meetingNumber
         minutes_rows = findMinutesRowsInYearRows(t)
@@ -400,7 +400,7 @@ def getAllMeetingMinutes(forceRefresh = False):
             allMtgMinutes = pickle.load(file)
     else:
         allMtgMinutes = {}
-        tables = updateDocRegTablesToLatest()
+        tables = utcDocRegTables
         for y, t in tables.items():
             # looking at doc registry for one year (y)
             year_reg_url = utcDocRegistry_urls[y]
@@ -501,20 +501,20 @@ def fetchMeetingMinutes(meetingNumber):
 def updateAllMeetingMinutesWithLatest():
     pickle_file = Path(utcMinutesPages_pickleFile)
     if not pickle_file.is_file():
-        allMtgMinutes = getAllMeetingMinutes()
+        allStoredMtgMinutes = getAllMeetingMinutes()
     else:
         # get pickled minutes info
         with open(utcMinutesPages_pickleFile, 'rb') as file:
-            allMtgMinutes = pickle.load(file)
+            allStoredMtgMinutes = pickle.load(file)
         # get details on last stored meeting
-        allMeetings = list(allMtgMinutes)
-        lastStoredMeetingNumber = allMeetings[-1]
-        lastStoredMeetingYear = allMtgMinutes[lastStoredMeetingNumber][0]
+        allStoredMeetings = list(allStoredMtgMinutes)
+        lastStoredMeetingNumber = allStoredMeetings[-1]
+        lastStoredMeetingYear = allStoredMtgMinutes[lastStoredMeetingNumber][0]
         # compare to known
         lastKnownYear = list(utcDocRegistry_urls)[-1]
         yearsToCheck = list(range(lastStoredMeetingYear, lastKnownYear + 1))
 
-        docRegTables = updateDocRegTablesToLatest()
+        docRegTables = utcDocRegTables
         for y in yearsToCheck:
             # looking at doc registry for one year (y)
             year_reg_url = utcDocRegistry_urls[y]
@@ -534,11 +534,11 @@ def updateAllMeetingMinutesWithLatest():
                     m = re.search('(UTC ?#?)([0-9]*)', title)
                     assert m is not None
                     mtg_num = int(m.group(2))
-                    allMtgMinutes[mtg_num] = [y, i + 1, str(minutes_rows[i][0]), str(title), page]
+                    allStoredMtgMinutes[mtg_num] = [y, i + 1, str(minutes_rows[i][0]), str(title), page]
 
         with open(pickle_file, 'wb') as file:
-            pickle.dump(allMtgMinutes, file, protocol=pickle.HIGHEST_PROTOCOL)
-    return allMtgMinutes
+            pickle.dump(allStoredMtgMinutes, file, protocol=pickle.HIGHEST_PROTOCOL)
+    return allStoredMtgMinutes
 
 
 def findActionsInMinutes(doc:list, actionType):
@@ -629,7 +629,6 @@ def findTaggedActionsInMinutes(doc:list, actionType = "all"):
     soup = BeautifulSoup(pageContent, 'lxml')
     # define the pattern for the action ID contained in the anchor element
     pattern = patterns[actionType]
-#    pattern = '[0-9]{0,3}-AI?|C|L|M|N)[0-9a-z]{1,4}'
     actionAnchorElements = soup.find_all("a", string=re.compile(pattern))
     actions = [
         # a.find_parent(["blockquote", "div", "p", "ul"]).text
@@ -657,7 +656,7 @@ def compileActionsFromAllMinutes(actionType):
         return
 
     allActions = {}
-    meetings = getAllMeetingMinutes()
+    meetings = utc_minutes
     for mtgNum, mtg in meetings.items():
         print(f"getting actions for meeting {mtgNum}")
         actions = findActionsInMinutes(mtg, actionType)
@@ -680,12 +679,12 @@ def compileTaggedActionsFromAllMinutes(actionType = "all", minutesData = None):
         return
 
     if minutesData is None:
-        meetings = getAllMeetingMinutes()
+        allMinutes = utc_minutes
     else:
-        meetings = minutesData
+        allMinutes = minutesData
 
     allActions = {}
-    for mtgNum, mtg in meetings.items():
+    for mtgNum, mtg in allMinutes.items():
         if mtgNum >= 90:
             print(f"getting actions for meeting {mtgNum}")
             actions = findTaggedActionsInMinutes(mtg, actionType)
@@ -708,16 +707,43 @@ def writeToFileTaggedActionsFromAllMinutes(filename: str, actionType = "all", mi
     f.close()
 
 
+def searchForTextInAllMinutes(text):
+    # return a dict {mtgNum: [results]}
+    pass
+
+def searchForTextInMinutes(text, meetingNumber, ignoreCase = True):
+    ### Searches in the minutes for the specified meeting number, and
+    ### returns a list of results. 
+    ### 
+    ### Each result is the text content of the parent element from a match,
+    ### with extra whitespace removed.
+    
+    # check that meetingNumber is in range of known meetings
+    firstKnown, lastKnown = getFirstAndLastKnownUtcMeetings()
+    if meetingNumber not in range(firstKnown, lastKnown + 1):
+        print("Meeting number ", meetingNumber, " is not a known UTC meeting.")
+        return
+    
+    minutes = utc_minutes[meetingNumber]
+    soup = BeautifulSoup(minutes[-1],'lxml')
+    if ignoreCase:
+        matches = soup.find_all(string=re.compile(text, re.IGNORECASE))
+    else:
+        matches = soup.find_all(string=re.compile(text))
+    if len(matches) == 0:
+        print("No matches found")
+        return
+    else:
+        results = [
+            re.sub('\s+', ' ', s.parent.text)
+            for s in matches
+            if not isinstance(s, Comment)
+        ]
+        return results
+
 
 # utcDocRegPages = getAllDocRegistryPages()
 # utcDocRegPages = updateDocRegPagesToLatest()
 
-# utcDocRegTables = getAllDocRegistryTables()
-# utcDocRegTables = updateDocRegTablesToLatest()
-
-# utc_minutes = getAllMeetingMinutes()
+utcDocRegTables = updateDocRegTablesWithLatest()
 utc_minutes = updateAllMeetingMinutesWithLatest()
-
-
-# minutes = fetchMinutesForMeetingRange(lastMeeting=121)
-
