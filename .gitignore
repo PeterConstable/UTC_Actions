@@ -308,6 +308,7 @@ __pycache__/
 
 # Python virtual environment
 venv/
+.venv/
 
 # Cake - Uncomment if you are using it
 # tools/**
@@ -351,3 +352,6 @@ MigrationBackup/
 
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
+
+# VS Code config files
+.vscode/
