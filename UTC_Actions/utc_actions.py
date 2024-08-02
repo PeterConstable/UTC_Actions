@@ -44,6 +44,10 @@ earlyUtcMinutesRows = {
     88: (2001, 3, ['L2/01-295', '01295.htm', 'Minutes from the UTC/L2 meeting #88 (R)', 'Lisa Moore', '2001-09-07']),
     89: (2001, 4, ['L2/01-405', '01405.htm', 'Minutes from the UTC/L2 meeting in Mountain View, November 6-9, 2001', 'Lisa Moore', '2001-11-12'])
 }
+earlyMinutes = {
+    2000: [82, 83, 84, 85],
+    2001: [86, 87, 88, 89]
+}
 
 
 # relative paths for pickle files to cache raw doc registry pages, 
@@ -294,6 +298,34 @@ def updateDocRegTablesToLatest():
 #--------------------------------------------------------
 #  Functions for yearly UTC meeting minutes documents
 
+def getFirstAndLastKnownUtcMeetings():
+    tables = updateDocRegTablesToLatest()
+    earliest = 999
+    latest = 0
+    for y, t in tables.items():
+        if y in list(earlyMinutes):
+            if earlyMinutes[y][0] < earliest:
+                earliest = earlyMinutes[y][0]
+            if earlyMinutes[y][-1] > latest:
+                latest = earlyMinutes[y][-1]
+        else:
+            minutes_rows = findMinutesRowsInYearRows(t)
+            firstMtgNum = getMeetingNumberFromMinutesRow(minutes_rows[0])
+            if firstMtgNum < earliest:
+                earliest = firstMtgNum
+            lastMtgNum = getMeetingNumberFromMinutesRow(minutes_rows[-1])
+            if lastMtgNum > latest:
+                latest = lastMtgNum
+    return (earliest, latest)
+
+
+def getMeetingNumberFromMinutesRow(minutesRow):
+    # Assumes the row is not from years 2001 and earlier
+    m = re.search('(UTC ?#?)([0-9]*)', minutesRow[2])
+    assert m is not None
+    return int(m.group(2))
+
+
 def findMinutesRowsInYearRows(table:list):
     minutes_rows = [
         row for row in table
@@ -314,7 +346,7 @@ def findMinutesRowForMeeting(meetingNumber):
             r = minutes_rows[i]
             m = re.search('(UTC ?[a-zA-Z ]*#?)([0-9]*)', r[2])
             if m.group(2) != '' and meetingNumber == int(m.group(2)):
-                return (y, i, r)
+                return (y, i + 1, r)
             else:
                 continue
 
@@ -400,6 +432,49 @@ def getAllMeetingMinutes(forceRefresh = False):
     return allMtgMinutes
 
 
+def updatePickedMeetingMinutesForMeetingList(meetingList):
+    for i in meetingList:
+        updatePickledMeetingMinutes(i)
+
+def updatePickledMeetingMinutes(meetingNumber):
+    updatePickledMeetingMinutesForMeetingRange(meetingNumber, meetingNumber)
+
+def updatePickledMeetingMinutesForMeetingRange(firstMeeting = 1, lastMeeting = 999):
+    ### Opens an existing utcMinutesPages_pickleFile, fetches the pages for
+    ### specified meetings and replaces the content for those meetings, then
+    ### saves the updated pickle file.
+    ### 
+    ### If utcMinutesPages_pickleFile doesn't exist, calls getAllMeetingMinutes.
+    ###
+    ### If not specified, firstMeeting will be the first meeting from the
+    ### first supported year; and lastMeeting will be the last meeting with
+    ### posted minutes in the last supported year.
+
+    pickle_file = Path(utcMinutesPages_pickleFile)
+    if pickle_file.is_file():
+        with open(utcMinutesPages_pickleFile, 'rb') as file:
+            allMtgMinutes = pickle.load(file)
+    else:
+        print("Pickle file for meeting minutes not found; fetching all meeting minutes...")
+        getAllMeetingMinutes()
+        return
+    
+    # Limit range to known meetings
+    firstKnown, lastKnown = getFirstAndLastKnownUtcMeetings()
+    if firstMeeting < firstKnown:
+        firstKnown = firstKnown
+    if lastMeeting > lastKnown:
+        lastMeeting = lastKnown
+
+    for i in range(firstMeeting, lastMeeting + 1):
+        allMtgMinutes[i] = fetchMeetingMinutes(i)
+
+    with open(pickle_file, 'wb') as file:
+        print("Saving updated pickle file")
+        pickle.dump(allMtgMinutes, file, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+
 def fetchMeetingMinutes(meetingNumber):
     ### Returns the doc content & details for minutes of a given UTC meeting.
     ### If minutes are not found, returns None.
@@ -420,10 +495,10 @@ def fetchMeetingMinutes(meetingNumber):
     m = re.search('(UTC ?#?)([0-9]*)', title)
     assert m is not None
     mtg_num = int(m.group(2))
-    return [year, sequenceInYear + 1, str(minutesRow[0]), str(title), page]
+    return [year, sequenceInYear, str(minutesRow[0]), str(title), page]
 
 
-def updateAllMeetingMinutesToLatest():
+def updateAllMeetingMinutesWithLatest():
     pickle_file = Path(utcMinutesPages_pickleFile)
     if not pickle_file.is_file():
         allMtgMinutes = getAllMeetingMinutes()
@@ -433,11 +508,11 @@ def updateAllMeetingMinutesToLatest():
             allMtgMinutes = pickle.load(file)
         # get details on last stored meeting
         allMeetings = list(allMtgMinutes)
-        lastMeetingNumber = allMeetings[-1]
-        lastMeetingYear = allMtgMinutes[lastMeetingNumber][0]
+        lastStoredMeetingNumber = allMeetings[-1]
+        lastStoredMeetingYear = allMtgMinutes[lastStoredMeetingNumber][0]
         # compare to known
         lastKnownYear = list(utcDocRegistry_urls)[-1]
-        yearsToCheck = list(range(lastMeetingYear, lastKnownYear + 1))
+        yearsToCheck = list(range(lastStoredMeetingYear, lastKnownYear + 1))
 
         docRegTables = updateDocRegTablesToLatest()
         for y in yearsToCheck:
@@ -449,10 +524,8 @@ def updateAllMeetingMinutesToLatest():
             minutes_rows = findMinutesRowsInYearRows(yearTable)
 
             for i in range(len(minutes_rows)):
-                m = re.search('(UTC ?#?)([0-9]*)', minutes_rows[i][2])
-                assert m is not None
-                mtg_num = int(m.group(2))
-                if mtg_num > lastMeetingNumber:
+                mtg_num = getMeetingNumberFromMinutesRow(minutes_rows[i])
+                if mtg_num > lastStoredMeetingNumber:
                     url = base_url + minutes_rows[i][1]
                     print(f"retrieving UTC meeting {mtg_num} minutes doc")
                     page = requests.get(url).text
@@ -643,7 +716,7 @@ def writeToFileTaggedActionsFromAllMinutes(filename: str, actionType = "all", mi
 # utcDocRegTables = updateDocRegTablesToLatest()
 
 # utc_minutes = getAllMeetingMinutes()
-utc_minutes = updateAllMeetingMinutesToLatest()
+utc_minutes = updateAllMeetingMinutesWithLatest()
 
 
 # minutes = fetchMinutesForMeetingRange(lastMeeting=121)
