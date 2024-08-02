@@ -1,5 +1,5 @@
 import requests
-from bs4 import BeautifulSoup, Comment, Tag
+from bs4 import BeautifulSoup, Comment, Tag, NavigableString
 from pathlib import Path
 import pickle
 import re
@@ -33,6 +33,17 @@ utcDocRegistry_urls = {
     2023: "https://www.unicode.org/L2/L2023/Register-2023.html",
     2024: "https://www.unicode.org/L2/L-curdoc.htm"
     }
+
+# The doc registry index pages don't reliably include meeting #s for
+# UTC meetings before UTC #90. The following hard codes the index
+# table row data for some early meetings.
+earlyUtcMinutesRows = {
+    84: (2000, 3, ['L2/00-187', '00187.htm', 'UTC minutes – Boston, August 8-11, 2000', 'Lisa Moore', '2000-08-23']),
+    85: (2000, 4, ['L2/00-324', '00324.htm', 'Minutes from the UTC meeting in San Diego', 'Lisa Moore', '2000-12-27']),
+    87: (2001, 2, ['L2/01-184', '01184.htm', 'Minutes from the UTC/L2 meeting ', 'Lisa Moore', '2001-06-18']),
+    88: (2001, 3, ['L2/01-295', '01295.htm', 'Minutes from the UTC/L2 meeting #88 (R)', 'Lisa Moore', '2001-09-07']),
+    89: (2001, 4, ['L2/01-405', '01405.htm', 'Minutes from the UTC/L2 meeting in Mountain View, November 6-9, 2001', 'Lisa Moore', '2001-11-12'])
+}
 
 
 # relative paths for pickle files to cache raw doc registry pages, 
@@ -208,7 +219,7 @@ def getDocRegTableFromPage(page):
     return rows
 
 
-def getAllDocRegistryTables():
+def getAllDocRegistryTables(forceRefresh = False):
     '''Get the UTC doc registries as a dict of cleaned-up tables.
     
     Returns a dict of doc-registry tables keyed by year. Each dict is a list of
@@ -226,7 +237,7 @@ def getAllDocRegistryTables():
 
     # load from pickle file, if present
     pickle_file = Path(utcDocRegTables_pickleFile)
-    if pickle_file.is_file():
+    if pickle_file.is_file() and not forceRefresh:
         with open(utcDocRegTables_pickleFile, 'rb') as file:
             tables = pickle.load(file)
     else:
@@ -294,6 +305,20 @@ def findMinutesRowsInYearRows(table:list):
     return minutes_rows
 
 
+def findMinutesRowForMeeting(meetingNumber):
+    tables = getAllDocRegistryTables()
+    for y, t in tables.items():
+        # looking at doc registry for year y, check for meetingNumber
+        minutes_rows = findMinutesRowsInYearRows(t)
+        for i in range(len(minutes_rows)):
+            r = minutes_rows[i]
+            m = re.search('(UTC ?[a-zA-Z ]*#?)([0-9]*)', r[2])
+            if m.group(2) != '' and meetingNumber == int(m.group(2)):
+                return (y, i, r)
+            else:
+                continue
+
+
 def getMinutesDetails(base_url, doc_row:list, lastMeetingNumber:int = 0):
     details = []
     m = re.search('((UTC|UCT) ?#?)([0-9]*)', doc_row[2])
@@ -310,14 +335,39 @@ def getMinutesDetails(base_url, doc_row:list, lastMeetingNumber:int = 0):
     return details
 
 
+def fetchMinutesForMeetingRange(firstMeeting=1, lastMeeting=999):
+    ### Fetches meeting minutes for a range or meetings. Returns
+    ### a dict with structure {mtg#: [year, qtr, doc #, title, page content] }.
+    ###
+    ### If not specified, firstMeeting will be the first meeting from the
+    ### first supported year; and lastMeeting will be the last meeting with
+    ### posted minutes in the last supported year.
 
-def getAllMeetingMinutes():
+    firstMeeting = max(firstMeeting, min(list(utc_minutes.keys())))
+    lastMeeting = min(lastMeeting, max(list(utc_minutes.keys())))
+
+    print("Fetching minutes for meetings", firstMeeting, "to", lastMeeting)
+
+    # Docs will be fetched from the server; pickled docs are not used.
+
+    allMtgMinutes = {}
+    for i in range(firstMeeting, lastMeeting + 1):
+        allMtgMinutes[i] = fetchMeetingMinutes(i)
+    return allMtgMinutes
+
+
+
+def getAllMeetingMinutes(forceRefresh = False):
+    ### Returns a dict with data for all UTC meeting minutes in the supported range.
+    ### The dict structure is {mtg#: [year, qtr, doc #, title, page content]}.
+    ### Uses pickled data if present; if not, it will pickle the results.
+
     pickle_file = Path(utcMinutesPages_pickleFile)
-    if pickle_file.is_file():
+    if pickle_file.is_file() and not forceRefresh:
         with open(utcMinutesPages_pickleFile, 'rb') as file:
             allMtgMinutes = pickle.load(file)
     else:
-        allMtgMinutes = {} #entries will have: mtg # (key), year, qtr, doc #, title, page content
+        allMtgMinutes = {}
         tables = updateDocRegTablesToLatest()
         for y, t in tables.items():
             # looking at doc registry for one year (y)
@@ -348,6 +398,29 @@ def getAllMeetingMinutes():
             pickle.dump(allMtgMinutes, file, protocol=pickle.HIGHEST_PROTOCOL)
             pass
     return allMtgMinutes
+
+
+def fetchMeetingMinutes(meetingNumber):
+    ### Returns the doc content & details for minutes of a given UTC meeting.
+    ### If minutes are not found, returns None.
+
+    if meetingNumber in earlyUtcMinutesRows.keys():
+        (year, sequenceInYear, minutesRow) = earlyUtcMinutesRows[meetingNumber]
+    else:
+        (year, sequenceInYear, minutesRow) = findMinutesRowForMeeting(meetingNumber)
+    if minutesRow is None: return
+
+    year_reg_url = utcDocRegistry_urls[year]
+    base_url = year_reg_url[:year_reg_url.rindex("/") + 1]
+    minutesURL = base_url + minutesRow[1]
+    print(f"retrieving UTC meeting {meetingNumber} minutes doc")
+    page = requests.get(minutesURL).text
+    soup = BeautifulSoup(page, 'lxml')
+    title = soup.title.text
+    m = re.search('(UTC ?#?)([0-9]*)', title)
+    assert m is not None
+    mtg_num = int(m.group(2))
+    return [year, sequenceInYear + 1, str(minutesRow[0]), str(title), page]
 
 
 def updateAllMeetingMinutesToLatest():
@@ -423,14 +496,15 @@ def findActionsInMinutes(doc:list, actionType):
         "AI": "A(C|c)(T|t)(I|i)(O|o)(N|n) (I|i)(T|t)(E|e)(M|m)",
         "consensus": "C(O|o)(N|n)(S|s)(E|e)(N|n)(S|s)(U|u)(S|s)",
         "motion": "M(O|o)(T|t)(I|i)(O|o)(N|n)",
-        "note": "N(O|o)(T|t)(E|e)"
+        "note": "N(O|o)(T|t)(E|e):"
         }
     pattern = patterns[actionType]
     actionStrings = soup.find_all(string = re.compile(pattern))
     actions = [
         # Different minutes docs are structured differently (and some, badly)
-        re.sub('\s_', ' ', s.find_parent(["blockquote", "dd", "div", "p", "ul"]).text)
+        re.sub('\s+', ' ', s.find_parent(["blockquote", "dd", "div", "p", "ul"]).text)
         for s in actionStrings
+        if not isinstance(s, Comment)
         ]
     return actions
 
@@ -444,7 +518,19 @@ def getAnchorParentText(a):
     return p
 
 
-def findAllTaggedActionsInMinutes(doc:list):
+def validateActionType(actionType, acceptNone = True):
+    if actionType is None and acceptNone:
+        return True
+    elif actionType is None:
+        return False
+    elif actionType not in ["ai", "consensus", "lballot", "motion", "note", "all"]:
+        print("The actionType parameter must be 'ai', 'consensus', 'motion', or 'note'.")
+        return False
+    else:
+        return True
+
+
+def findTaggedActionsInMinutes(doc:list, actionType = "all"):
     ''' Gets a list of actions (all types) from a minutes doc. This assumes a
         convention applied since UTC #90 that a "tagging" tool is run on the
         minutes file turning the ID prefix for each action (e.g., "[123-C45]")
@@ -454,15 +540,31 @@ def findAllTaggedActionsInMinutes(doc:list):
 
         Takes a row from a minutes entry and returns a list of action strings.
     '''
+    patterns = {
+        "ai": '[0-9]{0,3}-AI?[0-9a-z]{1,4}',
+        "consensus": '[0-9]{0,3}-C[0-9a-z]{1,4}',
+        "motion": '[0-9]{0,3}-M[0-9a-z]{1,4}',
+        "note": '[0-9]{0,3}-N[0-9a-z]{1,4}',
+        "lballot": '[0-9]{0,3}-L[0-9a-z]{1,4}',
+        "all": '[0-9]{0,3}-(AI?|C|L|M|N)[0-9a-z]{1,4}'
+    }
+
+    if not validateActionType(actionType):
+        return
+
     pageContent = doc[-1]
     soup = BeautifulSoup(pageContent, 'lxml')
     # define the pattern for the action ID contained in the anchor element
-    pattern = '[0-9]{0,3}-(AI?|C|L|M|N)[0-9a-z]{1,4}'
+    pattern = patterns[actionType]
+#    pattern = '[0-9]{0,3}-AI?|C|L|M|N)[0-9a-z]{1,4}'
     actionAnchorElements = soup.find_all("a", string=re.compile(pattern))
     actions = [
-        # e.find_parent(["blockquote", "div", "p", "ul"]).text
-        getAnchorParentText(e)
-        for e in actionAnchorElements
+        # a.find_parent(["blockquote", "div", "p", "ul"]).text
+        # getAnchorParentText(a)
+        re.sub('\s+',' ', a.find_parent(["blockquote", "dd", "div", "p", "ul"]).text).strip()
+        for a in actionAnchorElements
+        if isinstance(a.next_sibling, NavigableString) and a.next_sibling[0] == ']' 
+            and isinstance(a.previous_sibling, NavigableString) and a.previous_sibling.strip() == '[' #some cases have whitespace
         ]
     return actions
 
@@ -477,31 +579,54 @@ def compileActionsFromAllMinutes(actionType):
         For example compilesActionsFromAllMinutes("AI")[179] would return the
         list of all action items from meeting 179.
     '''
+
+    if not validateActionType(actionType, acceptNone=False):
+        return
+
     allActions = {}
     meetings = getAllMeetingMinutes()
     for mtgNum, mtg in meetings.items():
         print(f"getting actions for meeting {mtgNum}")
         actions = findActionsInMinutes(mtg, actionType)
-        allActions[mtgNum] = actions
-    return allActions
-
-
-def compileAllTaggedActionsFromAllMinutes():
-    ''' Compiles all actions of all types from all UTC meetings for which
-        the minutes have had the "tag" tool applied (started with UTC #90).
-    '''
-    allActions = {}
-    meetings = getAllMeetingMinutes()
-    for mtgNum, mtg in meetings.items():
-        if mtgNum >= 90:
-            print(f"getting actions for meeting {mtgNum}")
-            actions = findAllTaggedActionsInMinutes(mtg)
+        if len(actions) > 0:
             allActions[mtgNum] = actions
     return allActions
 
 
-def writeToFileAllTaggedActionsFromAllMinutes(filename: str):
-    allActions = compileAllTaggedActionsFromAllMinutes()
+def compileTaggedActionsFromAllMinutes(actionType = "all", minutesData = None):
+    ### Compiles all actions of all types from all UTC meetings for which
+    ### the minutes have had the "tag" tool applied (started with UTC #90).
+    ###
+    ### The optional minutesData parameter can be used to pass in custom
+    ### minutes data (e.g., for a limited range of meetings). Otherwise,
+    ### minutes for all supported meetings will be used, using pickled data
+    ### if present.
+
+
+    if not validateActionType(actionType):
+        return
+
+    if minutesData is None:
+        meetings = getAllMeetingMinutes()
+    else:
+        meetings = minutesData
+
+    allActions = {}
+    for mtgNum, mtg in meetings.items():
+        if mtgNum >= 90:
+            print(f"getting actions for meeting {mtgNum}")
+            actions = findTaggedActionsInMinutes(mtg, actionType)
+            if len(actions) > 0 :
+                allActions[mtgNum] = actions
+    return allActions
+
+
+def writeToFileTaggedActionsFromAllMinutes(filename: str, actionType = "all", minutesData = None):
+
+    if not validateActionType(actionType):
+        return
+
+    allActions = compileTaggedActionsFromAllMinutes(actionType, minutesData)
     f = open(filename, "w", encoding="utf-8")
     for mtgNum, actions in allActions.items():
         f.write(str(mtgNum) + "\n")
@@ -521,5 +646,5 @@ def writeToFileAllTaggedActionsFromAllMinutes(filename: str):
 utc_minutes = updateAllMeetingMinutesToLatest()
 
 
-
+# minutes = fetchMinutesForMeetingRange(lastMeeting=121)
 
