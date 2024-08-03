@@ -478,7 +478,9 @@ def updatePickledMeetingMinutesForMeetingRange(firstMeeting = 1, lastMeeting = 9
         pickle.dump(allMtgMinutes, file, protocol=pickle.HIGHEST_PROTOCOL)
 
     # Since this has been updated, update utc_minutes
+    global utc_minutes
     utc_minutes = allMtgMinutes
+
 
 
 def fetchMeetingMinutes(meetingNumber):
