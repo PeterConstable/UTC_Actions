@@ -388,6 +388,9 @@ def fetchMinutesForMeetingRange(firstMeeting=1, lastMeeting=999):
     return allMtgMinutes
 
 
+def refreshUtcMinutes():
+    utc_minutes = getAllMeetingMinutes()
+
 
 def getAllMeetingMinutes(forceRefresh = False):
     ### Returns a dict with data for all UTC meeting minutes in the supported range.
@@ -442,7 +445,7 @@ def updatePickledMeetingMinutes(meetingNumber):
 def updatePickledMeetingMinutesForMeetingRange(firstMeeting = 1, lastMeeting = 999):
     ### Opens an existing utcMinutesPages_pickleFile, fetches the pages for
     ### specified meetings and replaces the content for those meetings, then
-    ### saves the updated pickle file.
+    ### saves the updated pickle file. Also updates utc_minutes.
     ### 
     ### If utcMinutesPages_pickleFile doesn't exist, calls getAllMeetingMinutes.
     ###
@@ -466,6 +469,7 @@ def updatePickledMeetingMinutesForMeetingRange(firstMeeting = 1, lastMeeting = 9
     if lastMeeting > lastKnown:
         lastMeeting = lastKnown
 
+    # Fetch the file and update data
     for i in range(firstMeeting, lastMeeting + 1):
         allMtgMinutes[i] = fetchMeetingMinutes(i)
 
@@ -473,6 +477,8 @@ def updatePickledMeetingMinutesForMeetingRange(firstMeeting = 1, lastMeeting = 9
         print("Saving updated pickle file")
         pickle.dump(allMtgMinutes, file, protocol=pickle.HIGHEST_PROTOCOL)
 
+    # Since this has been updated, update utc_minutes
+    utc_minutes = allMtgMinutes
 
 
 def fetchMeetingMinutes(meetingNumber):
