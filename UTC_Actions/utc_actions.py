@@ -509,15 +509,15 @@ def fetchMeetingMinutes(meetingNumber):
 def updateAllMeetingMinutesWithLatest():
     pickle_file = Path(utcMinutesPages_pickleFile)
     if not pickle_file.is_file():
-        allStoredMtgMinutes = getAllMeetingMinutes()
+        allMtgMinutes = getAllMeetingMinutes()
     else:
         # get pickled minutes info
         with open(utcMinutesPages_pickleFile, 'rb') as file:
-            allStoredMtgMinutes = pickle.load(file)
+            allMtgMinutes = pickle.load(file)
         # get details on last stored meeting
-        allStoredMeetings = list(allStoredMtgMinutes)
+        allStoredMeetings = list(allMtgMinutes)
         lastStoredMeetingNumber = allStoredMeetings[-1]
-        lastStoredMeetingYear = allStoredMtgMinutes[lastStoredMeetingNumber][0]
+        lastStoredMeetingYear = allMtgMinutes[lastStoredMeetingNumber][0]
         # compare to known
         lastKnownYear = list(utcDocRegistry_urls)[-1]
         yearsToCheck = list(range(lastStoredMeetingYear, lastKnownYear + 1))
@@ -542,11 +542,11 @@ def updateAllMeetingMinutesWithLatest():
                     m = re.search('(UTC ?#?)([0-9]*)', title)
                     assert m is not None
                     mtg_num = int(m.group(2))
-                    allStoredMtgMinutes[mtg_num] = [y, i + 1, str(minutes_rows[i][0]), str(title), page]
+                    allMtgMinutes[mtg_num] = [y, i + 1, str(minutes_rows[i][0]), str(title), page]
 
         with open(pickle_file, 'wb') as file:
-            pickle.dump(allStoredMtgMinutes, file, protocol=pickle.HIGHEST_PROTOCOL)
-    return allStoredMtgMinutes
+            pickle.dump(allMtgMinutes, file, protocol=pickle.HIGHEST_PROTOCOL)
+    return allMtgMinutes
 
 
 def findActionsInMinutes(doc:list, actionType):
@@ -716,11 +716,41 @@ def writeToFileTaggedActionsFromAllMinutes(filename: str, actionType = "all", mi
     f.close()
 
 
-def searchForTextInAllMinutes(text):
-    # return a dict {mtgNum: [results]}
-    pass
+def findUtcAction(actionID):
+    pattern = re.compile('([0-9]{1,3})-((?i:AI?|C|M|M|N))[0-9]{1,3}[a-z]?')
+    m = re.match(pattern, actionID)
+    if m is None:
+        print(f'{actionID} is not a valid action ID')
+    else:
+        mtgNum = int(m.group(1))
+        actionType = m.group(2).upper()
+        actionTypeKeys = {"A": "ai", "C": "consensus", "L": "lballot", "M": "motion", "N": "note"}
+        actionTypeKey = actionTypeKeys[actionType]
+        actions = findTaggedActionsInMinutes(utc_minutes[mtgNum], actionTypeKey)
+        for a in actions:
+            if a[0:len(actionID)+2] == "[" + actionID + "]":
+                return a
+        print(f'Action {actionID} not found in UTC #{mtgNum} minutes')
 
-def searchForTextInMinutes(text, meetingNumber, ignoreCase = True):
+
+def searchForTextInAllMinutes(text, ignoreCase = True):
+    # return a dict {mtgNum: [results]}
+    results = {}
+    count = 0
+    for mtgNum in list(utc_minutes):
+        result = searchForTextInMinutes(text, mtgNum, ignoreCase, True, False)
+        if result is not None:
+            count += len(result)
+            results[mtgNum] = result
+    if count == 0:
+        print("No matches found")
+    elif count == 1:
+        print("1 match found")
+    else:
+        print(f'{count} matches found')
+    return results
+
+def searchForTextInMinutes(text, meetingNumber, ignoreCase = True, reportMatch = True, reportNoMatch = True):
     ### Searches in the minutes for the specified meeting number, and
     ### returns a list of results. 
     ### 
@@ -740,9 +770,15 @@ def searchForTextInMinutes(text, meetingNumber, ignoreCase = True):
     else:
         matches = soup.find_all(string=re.compile(text))
     if len(matches) == 0:
-        print("No matches found")
+        if reportNoMatch:
+            print("No matches found")
         return
     else:
+        if reportMatch:
+            if len(matches) == 1:
+                print(f'1 match found in UTC #"{meetingNumber}')
+            else:
+                print(f'{len(matches)} matches found in UTC #{meetingNumber}')
         results = [
             re.sub('\s+', ' ', s.parent.text)
             for s in matches
@@ -755,4 +791,4 @@ def searchForTextInMinutes(text, meetingNumber, ignoreCase = True):
 # utcDocRegPages = updateDocRegPagesToLatest()
 
 utcDocRegTables = updateDocRegTablesWithLatest()
-utc_minutes = updateAllMeetingMinutesWithLatest()
+utc_minutes = updateAllMeetingMinutesWithLatest() #{mtg#: [year, qtr, doc #, title, page content]}
