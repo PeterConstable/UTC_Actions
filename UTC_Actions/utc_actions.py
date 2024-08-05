@@ -604,8 +604,8 @@ def validateActionType(actionType, acceptNone = True):
         return True
     elif actionType is None:
         return False
-    elif actionType not in ["ai", "consensus", "lballot", "motion", "note", "all"]:
-        print("The actionType parameter must be 'ai', 'consensus', 'motion', or 'note'.")
+    elif actionType not in ["ai", "consensus", "decision", "lballot", "motion", "note", "all"]:
+        print("The actionType parameter must be 'ai', 'consensus', 'decision', 'lballot', 'motion', or 'note'.")
         return False
     else:
         return True
@@ -624,6 +624,7 @@ def findTaggedActionsInMinutes(doc:list, actionType = "all"):
     patterns = {
         "ai": '[0-9]{0,3}-AI?[0-9a-z]{1,4}',
         "consensus": '[0-9]{0,3}-C[0-9a-z]{1,4}',
+        "decision": '[0-9]{0,3}-(C|L|M)[0-9a-z]{1,4}',
         "motion": '[0-9]{0,3}-M[0-9a-z]{1,4}',
         "note": '[0-9]{0,3}-N[0-9a-z]{1,4}',
         "lballot": '[0-9]{0,3}-L[0-9a-z]{1,4}',
@@ -785,6 +786,25 @@ def searchForTextInMinutes(text, meetingNumber, ignoreCase = True, reportMatch =
             if not isinstance(s, Comment)
         ]
         return results
+
+
+def writeToFileSearchForTextResults(filename: str, text: str, meetingNumber = None, ignoreCase = True):
+    ### Writes search results to a file. If meetingNumber is None, searches all meetings.
+
+    if meetingNumber is None:
+        results = searchForTextInAllMinutes(text, ignoreCase)
+    else:
+        results = searchForTextInMinutes(text, meetingNumber, ignoreCase, reportMatch=False, reportNoMatch=False)
+    if len(results) == 0:
+        print("No results found")
+    else:
+        f = open(filename, "w", encoding="utf-8")
+        for mtgNum, mtgResults in results.items():
+            f.write(f'{str(mtgNum)}:\n')
+            for i in range(len(mtgResults)):
+                f.write(f'    {i+1}: {results[mtgNum][i]}\n')
+        f.close()
+
 
 
 # utcDocRegPages = getAllDocRegistryPages()
