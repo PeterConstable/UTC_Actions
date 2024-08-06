@@ -295,8 +295,80 @@ def updateDocRegTablesWithLatest():
 
 
 
+def searchForTextInDocRegTable(text, year, ignoreCase = True, textIsRegExPattern = False):
+    ### Searches in the subject field of the doc registry index for the specified year, 
+    ### and returns a list of results.
+    ###
+    ### The results are a list of row metadata from the doc registry table, i.e.,
+    ### [ [docNum, url, subject, author, date]* ].
+    ###
+    ### When searching in the subject field, \t, \r and \n will be converted to space before
+    ### the search is performed, and will be converted in the result.
+    ###
+    ### If a doc row has 'NOTPOSTED' in the url, a match in the subject can still be returned.
+    ###
+    ### If textIsRegExPattern is True, that will be used as the search pattern over the
+    ### entire content of the subject field. If False, then
+
+
+    # check that year is in range of known years
+    if year not in list(utcDocRegistry_urls):
+        print(f'UTC document registry infomation is not available for {year}.')
+        return
+    
+    if not textIsRegExPattern:
+        text = ".*" + text + ".*"
+    if ignoreCase:
+        pattern = re.compile(text, re.IGNORECASE)
+    else:
+        pattern = re.compile(text)
+
+    docRegTable = utcDocRegTables[year]
+    docResultRows = [
+        r for r in docRegTable
+        if re.match(pattern, re.sub('\s+', ' ', r[2])) is not None
+    ]
+    return docResultRows
+
+
+def searchForTextInAllDocRegTables(text, ignoreCase = True):
+    # returns a dict {year: [results]}
+    results = {}
+    count = 0
+    for year in list(utcDocRegTables):
+        result = searchForTextInDocRegTable(text, year, ignoreCase)
+        if len(result) != 0:
+            count += len(result)
+            results[year] = result
+    if count == 0:
+        print("No matches found")
+    elif count == 1:
+        print("1 match found")
+    else:
+        print(f'{count} matches found')
+    return results
+
+
+def writeToFileSearchForTextInDocRegistryResults(filename:str, text:str, year = None, ignoreCase = True):
+    if year is None:
+        results = searchForTextInAllDocRegTables(text, ignoreCase)
+    else:
+        results = searchForTextInDocRegTable(text, year, ignoreCase)
+    if len(results) == 0:
+        print("No results found")
+    else:
+        f = open(filename, "w", encoding="utf-8")
+        for year, resultRows in results.items():
+            f.write(f'{str(year)}:\n')
+            for i in range(len(resultRows)):
+                resultRow = resultRows[i]
+                subjectText = re.sub('\s+', ' ', resultRow[2])
+                f.write(f'    {i+1}: {resultRow[0]}: {subjectText}\n')
+        f.close()
+
+
 #--------------------------------------------------------
-#  Functions for yearly UTC meeting minutes documents
+#  Functions for UTC meeting minutes documents
 
 def getFirstAndLastKnownUtcMeetings():
     tables = utcDocRegTables
@@ -788,7 +860,7 @@ def searchForTextInMinutes(text, meetingNumber, ignoreCase = True, reportMatch =
         return results
 
 
-def writeToFileSearchForTextResults(filename: str, text: str, meetingNumber = None, ignoreCase = True):
+def writeToFileSearchForTextInMinutesResults(filename: str, text: str, meetingNumber = None, ignoreCase = True):
     ### Writes search results to a file. If meetingNumber is None, searches all meetings.
 
     if meetingNumber is None:
