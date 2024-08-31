@@ -31,3 +31,8 @@ This module relies on some packages that not typically bundled with Python distr
 Dependencies are captured in the `requirements.txt` file and can be installed using the following command line:
 
 > python -m pip install -r requirements.txt
+
+Creation/activation of a virtual environment before installing dependencies is recommended. E.g.,
+
+>python -m venv venv  
+>venv\Scripts\activate
