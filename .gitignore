@@ -358,3 +358,7 @@ MigrationBackup/
 
 # ignore pickle_jar folder in root (created by VS Code when debugging)
 pickle_jar/
+UTC_Actions/pickle_jar/
+
+# ignore output .txt files
+UTC_Actions/*.txt

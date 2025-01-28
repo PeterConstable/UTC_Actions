@@ -27,3 +27,8 @@ This module relies on some packages that not typically bundled with Python distr
 Dependencies are captured in the `requirements.txt` file and can be installed using the following command line:
 
 > python -m pip install -r requirements.txt
+
+If a `bs4.FeatureNotFound` error is encountered regarding `lxml`, try uninstalling then re-installing `lxml`:
+
+> pip uninstall lxml   
+> pip install lxml
