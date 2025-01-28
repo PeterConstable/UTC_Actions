@@ -31,7 +31,7 @@ utcDocRegistry_urls = {
     2021: "https://www.unicode.org/L2/L2021/Register-2021.html",
     2022: "https://www.unicode.org/L2/L2022/Register-2022.html",
     2023: "https://www.unicode.org/L2/L2023/Register-2023.html",
-    2024: "https://www.unicode.org/L2/L2023/Register-2024.html",
+    2024: "https://www.unicode.org/L2/L2024/Register-2024.html",
     2025: "https://www.unicode.org/L2/L-curdoc.htm"
     }
 
@@ -39,8 +39,11 @@ utcDocRegistry_urls = {
 # UTC meetings before UTC #90. The following hard codes the index
 # table row data for some early meetings.
 earlyUtcMinutesRows = {
+    82: (2000, 1, ['L2/00-005', '00005.htm', 'Minutes of UTC #82 in San Jose', 'Lisa Moore', '2000-02-09']),
+    83: (2000, 2, ['L2/00-115', '00115.htm', 'Minutes Of UTC Meeting #83', 'Lisa Moore', '2000-05-07']),
     84: (2000, 3, ['L2/00-187', '00187.htm', 'UTC minutes – Boston, August 8-11, 2000', 'Lisa Moore', '2000-08-23']),
     85: (2000, 4, ['L2/00-324', '00324.htm', 'Minutes from the UTC meeting in San Diego', 'Lisa Moore', '2000-12-27']),
+    86: (2001, 1, ['L2/01-012', '01012.htm', 'Minutes UTC #86 in Mountain View, Jan 2001', 'Lisa Moore', '2001-02-07']),
     87: (2001, 2, ['L2/01-184', '01184.htm', 'Minutes from the UTC/L2 meeting ', 'Lisa Moore', '2001-06-18']),
     88: (2001, 3, ['L2/01-295', '01295.htm', 'Minutes from the UTC/L2 meeting #88 (R)', 'Lisa Moore', '2001-09-07']),
     89: (2001, 4, ['L2/01-405', '01405.htm', 'Minutes from the UTC/L2 meeting in Mountain View, November 6-9, 2001', 'Lisa Moore', '2001-11-12'])
@@ -382,7 +385,7 @@ def getFirstAndLastKnownUtcMeetings():
             if earlyMinutes[y][-1] > latest:
                 latest = earlyMinutes[y][-1]
         else:
-            minutes_rows = findMinutesRowsInYearRows(t)
+            minutes_rows = findMinutesRowsInYearRows(y, t)
             firstMtgNum = getMeetingNumberFromMinutesRow(minutes_rows[0])
             if firstMtgNum < earliest:
                 earliest = firstMtgNum
@@ -398,12 +401,21 @@ def getMeetingNumberFromMinutesRow(minutesRow):
     assert m is not None
     return int(m.group(2))
 
+def getMinutesRowsForEarlyYear(year):
+    meetings = earlyMinutes[year]
+    minutesRows = []
+    for m in meetings:
+        minutesRows.append(earlyUtcMinutesRows[m][2])
+    return minutesRows
 
-def findMinutesRowsInYearRows(table:list):
+def findMinutesRowsInYearRows(year, table:list):
+    if year in (earlyMinutes.keys()):
+        return getMinutesRowsForEarlyYear()
     minutes_rows = [
         row for row in table
         if re.search('minute', row[2].lower()) is not None
         and re.search('(utc|uct)', row[2].lower()) is not None
+        and re.search('#[0-9]{2,3}', row[2]) is not None
         and row[1][-3:] != 'pdf'
         and row[1][-9:] != 'NOTPOSTED'
         ]
@@ -414,7 +426,11 @@ def findMinutesRowForMeeting(meetingNumber):
     tables = utcDocRegTables
     for y, t in tables.items():
         # looking at doc registry for year y, check for meetingNumber
-        minutes_rows = findMinutesRowsInYearRows(t)
+        if (meetingNumber in earlyUtcMinutesRows.keys()):
+            r = earlyUtcMinutesRows(meetingNumber)
+            return (r[0], r[1], r)
+        else:
+            minutes_rows = findMinutesRowsInYearRows(y, t)
         for i in range(len(minutes_rows)):
             r = minutes_rows[i]
             m = re.search('(UTC ?[a-zA-Z ]*#?)([0-9]*)', r[2])
@@ -482,7 +498,10 @@ def getAllMeetingMinutes(forceRefresh = False):
             year_reg_url = utcDocRegistry_urls[y]
             base_url = year_reg_url[:year_reg_url.rindex("/") + 1]
             # get the doc registry rows for UTC minutes -- minutes_rows is a list of lists
-            minutes_rows = findMinutesRowsInYearRows(t)
+            if (y in earlyMinutes.keys()):
+                minutes_rows = getMinutesRowsForEarlyYear(y)
+            else:
+                minutes_rows = findMinutesRowsInYearRows(y, t)
             print(f"retrieving UTC meeting minutes docs for {y}")
             for i in range(len(minutes_rows)):
 # The following lines are similar to lines in updateAllMeetingMinutesToLatest().
@@ -508,7 +527,7 @@ def getAllMeetingMinutes(forceRefresh = False):
     return allMtgMinutes
 
 
-def updatePickedMeetingMinutesForMeetingList(meetingList):
+def updatePickledMeetingMinutesForMeetingList(meetingList):
     for i in meetingList:
         updatePickledMeetingMinutes(i)
 
@@ -602,7 +621,7 @@ def updateAllMeetingMinutesWithLatest():
             base_url = year_reg_url[:year_reg_url.rindex("/") + 1]
             # get the doc registry rows for UTC minutes
             yearTable = docRegTables[y]
-            minutes_rows = findMinutesRowsInYearRows(yearTable)
+            minutes_rows = findMinutesRowsInYearRows(y, yearTable)
 
             for i in range(len(minutes_rows)):
                 mtg_num = getMeetingNumberFromMinutesRow(minutes_rows[i])
