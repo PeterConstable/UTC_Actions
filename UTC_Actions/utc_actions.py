@@ -904,3 +904,9 @@ def writeToFileSearchForTextInMinutesResults(filename: str, text: str, meetingNu
 
 utcDocRegTables = updateDocRegTablesWithLatest()
 utc_minutes = updateAllMeetingMinutesWithLatest() #{mtg#: [year, qtr, doc #, title, page content]}
+
+# write out text file with all "tagged" actions from all UTC minutes
+# writeToFileTaggedActionsFromAllMinutes("UTC-actions.txt")
+
+# write out text file with "tagged" decisions (motion, letter ballot, consensus) from all UTC minutes
+# writeToFileTaggedActionsFromAllMinutes("UTC-decisions.txt", "decision")
