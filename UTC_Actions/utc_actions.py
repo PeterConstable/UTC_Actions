@@ -31,7 +31,8 @@ utcDocRegistry_urls = {
     2021: "https://www.unicode.org/L2/L2021/Register-2021.html",
     2022: "https://www.unicode.org/L2/L2022/Register-2022.html",
     2023: "https://www.unicode.org/L2/L2023/Register-2023.html",
-    2024: "https://www.unicode.org/L2/L-curdoc.htm"
+    2024: "https://www.unicode.org/L2/L2023/Register-2024.html",
+    2025: "https://www.unicode.org/L2/L-curdoc.htm"
     }
 
 # The doc registry index pages don't reliably include meeting #s for

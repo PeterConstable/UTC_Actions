@@ -36,3 +36,8 @@ Creation/activation of a virtual environment before installing dependencies is r
 
 >python -m venv venv  
 >venv\Scripts\activate
+
+If a `bs4.FeatureNotFound` error is encountered regarding `lxml`, try uninstalling then re-installing `lxml`:
+
+> pip uninstall lxml   
+> pip install lxml
