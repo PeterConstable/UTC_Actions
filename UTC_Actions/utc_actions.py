@@ -330,7 +330,7 @@ def searchForTextInDocRegTable(text, year, ignoreCase = True, textIsRegExPattern
     docRegTable = utcDocRegTables[year]
     docResultRows = [
         r for r in docRegTable
-        if re.match(pattern, re.sub('\s+', ' ', r[2])) is not None
+        if re.match(pattern, re.sub('\\s+', ' ', r[2])) is not None
     ]
     return docResultRows
 
@@ -366,7 +366,7 @@ def writeToFileSearchForTextInDocRegistryResults(filename:str, text:str, year = 
             f.write(f'{str(year)}:\n')
             for i in range(len(resultRows)):
                 resultRow = resultRows[i]
-                subjectText = re.sub('\s+', ' ', resultRow[2])
+                subjectText = re.sub('\\s+', ' ', resultRow[2])
                 f.write(f'    {i+1}: {resultRow[0]}: {subjectText}\n')
         f.close()
 
@@ -675,7 +675,7 @@ def findActionsInMinutes(doc:list, actionType):
     actionStrings = soup.find_all(string = re.compile(pattern))
     actions = [
         # Different minutes docs are structured differently (and some, badly)
-        re.sub('\s+', ' ', s.find_parent(["blockquote", "dd", "div", "p", "ul"]).text)
+        re.sub('\\s+', ' ', s.find_parent(["blockquote", "dd", "div", "p", "ul"]).text)
         for s in actionStrings
         if not isinstance(s, Comment)
         ]
@@ -684,7 +684,7 @@ def findActionsInMinutes(doc:list, actionType):
 
 def getAnchorParentText(a):
     try:
-        p = re.sub('\s+',' ', a.find_parent(["blockquote", "dd", "div", "p", "ul"]).text)
+        p = re.sub('\\s+',' ', a.find_parent(["blockquote", "dd", "div", "p", "ul"]).text)
     except:
         print(f"exception: {a.text}")
         p = None
@@ -722,7 +722,7 @@ def findTaggedActionsInMinutes(doc:list, actionType = "all"):
         "lballot": '[0-9]{0,3}-L[0-9a-z]{1,4}',
         "all": '[0-9]{0,3}-(AI?|C|L|M|N)[0-9a-z]{1,4}'
     }
-    postAnchorPattern = re.compile("^[a-z]?\s*]")
+    postAnchorPattern = re.compile("^[a-z]?\\s*]")
 
     if not validateActionType(actionType):
         return
@@ -735,7 +735,7 @@ def findTaggedActionsInMinutes(doc:list, actionType = "all"):
     actions = [
         # a.find_parent(["blockquote", "div", "p", "ul"]).text
         # getAnchorParentText(a)
-        re.sub('\s+',' ', a.find_parent(["blockquote", "dd", "div", "p", "ul"]).text).strip()
+        re.sub('\\s+',' ', a.find_parent(["blockquote", "dd", "div", "p", "ul"]).text).strip()
         for a in actionAnchorElements
         if isinstance(a.next_sibling, NavigableString) and postAnchorPattern.match(a.next_sibling) is not None
             and isinstance(a.previous_sibling, NavigableString) and a.previous_sibling.strip() == '[' #some cases have whitespace
@@ -873,7 +873,7 @@ def searchForTextInMinutes(text, meetingNumber, ignoreCase = True, reportMatch =
             else:
                 print(f'{len(matches)} matches found in UTC #{meetingNumber}')
         results = [
-            re.sub('\s+', ' ', s.parent.text)
+            re.sub('\\s+', ' ', s.parent.text)
             for s in matches
             if not isinstance(s, Comment)
         ]
