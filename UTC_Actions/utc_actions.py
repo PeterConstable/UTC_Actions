@@ -557,7 +557,7 @@ def updatePickledMeetingMinutesForMeetingRange(firstMeeting = 1, lastMeeting = 9
     # Limit range to known meetings
     firstKnown, lastKnown = getFirstAndLastKnownUtcMeetings()
     if firstMeeting < firstKnown:
-        firstKnown = firstKnown
+        firstMeeting = firstKnown
     if lastMeeting > lastKnown:
         lastMeeting = lastKnown
 
